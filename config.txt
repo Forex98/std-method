@@ -1,0 +1,45 @@
+# Configuration for Negative Ion Analysis
+# Standard Method
+# Format: KEY = VALUE
+
+# Voltage range [V]
+VOLTAGE_START = -110
+VOLTAGE_STOP = 40
+VOLTAGE_STEPS = 151
+
+# Shifting range [v]
+V_MIN = -90
+V_MAX = -70
+
+# Fit tail range
+FIT_V_MIN = -100
+FIT_V_MAX = -80
+
+# Fixed voltages [V]
+MINUS_90V = -90
+MINUS_27V = -27
+PLUS_20V = 20
+
+# Plot settings
+FIGSIZE = (12, 10)
+CURRENT_SCALE = 1E9
+ALPHA = 0.7
+
+# Folder settings
+UNBIASED_FOLDER = "unbiased"
+BIASED_FOLDER = "biased"
+FILE_EXTENSION = ".dat"
+RESULTS_FOLDER = "results"
+
+# Strings (optional quotes)
+EXPERIMENT_NAME = "2025-12-16_set2"
+
+# Booleans
+VERBOSE = True
+SAVE_PLOTS = True
+
+# Lists
+EXCLUDED_FILES = [bad_data.txt, test_run.txt]
+
+# None values
+SPECIAL_FLAG = None
