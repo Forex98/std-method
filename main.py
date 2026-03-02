@@ -1,9 +1,14 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from dataloader import DataLoader
 from standardmethod import StandardMethod
 from configreader import ConfigReader
 from pathlib import Path
+
+print(f'numpy version: {np.__version__}')
+print(f'matplotlib version: {matplotlib.__version__}')
+print('\n')
 
 def comparison(inputlist: list) -> None:
 
@@ -101,14 +106,17 @@ def process_folders(folders: None | Path) -> list:
 def main() -> int:
 
     base_path = Path('.')
-    bad_names = ['__pycache__', 'plots', 'results']
+    bad_names = ['__pycache__', '.git', 'results']
     directories = [x for x in base_path.iterdir() if x.is_dir() and x.name not in bad_names]
 
+    esc: bool = False
+
+    print('Loading directories...\n')
 
     if len(directories) == 0:
 
-        print('WARNING: your folder is empty')
-        print('No directory found.')
+        print('WARNING: your folder is empty\n')
+        print('No directory found.\n')
 
     for directory in directories:
 
@@ -119,14 +127,17 @@ def main() -> int:
 
     if unbiased_path in directories and biased_path in directories:
 
-        print('Unbiased and Biased directories')
-        print('found in the main folder')
+        print('\n')
+        print('Unbiased and Biased directories found in the main folder')
         print('Do you want to anlyse them? [y/n]')
 
         control = input()
 
         if control == 'y':
 
+            print('\n')
+            print('Analysis of a single data set: ')
+            print('No comparison will be done')
             process_folders(folders=None)
 
         elif control == 'n':
@@ -134,6 +145,7 @@ def main() -> int:
             directories.remove(unbiased_path)
             directories.remove(biased_path)
 
+            print('\n')
             print('Biased and Unbiased folders ignored.')
             print('The following folders will be anlysed:')
 
@@ -141,8 +153,61 @@ def main() -> int:
 
                 print(f'{directory.name}')
 
-            results_list = process_folders(folders=directories)
-            comparison(results_list)
+            print('\n')
+            print('Do you want to ignore any folder? [y/n]')
+
+            control_folders: str = input()
+
+            try:
+
+                if control_folders == 'n':
+
+                    print('\n')
+                    print('No folders will be ignored')
+                    print('Analysis...')
+
+                    results_list = process_folders(folders=directories)
+                    comparison(results_list)
+
+                elif control_folders == 'y':
+
+                    print('\n')
+                    print('Insert the corresponding number of the folder to be ignored\n')
+                    print('To ignore more directories separate numbers with a space')
+
+                    for i, directory in enumerate(directories):
+
+                        print(f'{i}) {directory.name}')
+
+                    ignored_folders: str = input()
+                    to_ignore: list = []
+
+                    for f in ignored_folders.split():
+
+                        if int(f) < len(directories):
+
+                            to_ignore.append(int(f))
+
+                        else:
+
+                            print('\n')
+                            print(f'WARNING: {f} not valid - ignored.')
+                            print('Insert the number again:')
+                            f_correct = input()
+                            to_ignore.append(int(f_correct))
+
+                    directories = [d for i, d in enumerate(directories) if i not in to_ignore]
+
+                    print('\n')
+                    print('Directories suxcefully ignored!')
+
+                    results_list = process_folders(folders=directories)
+                    comparison(results_list)
+
+            except:
+
+                print('\n')
+                print('Wrong reply.')
 
     else:
 
@@ -151,7 +216,7 @@ def main() -> int:
             print(f'{directory.name} to be analysed.')
 
         print('Proceed with the analysis? [y/n]')
-        confirm = input()
+        confirm: str = input()
 
         if confirm == 'y':
 
