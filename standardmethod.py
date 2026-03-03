@@ -135,8 +135,14 @@ class StandardMethod:
         ax2.set_title('Biased Currents')
         ax2.grid(ls = '-.', alpha = 0.5)
 
+        # Add title
+        pathsplitted = self.results_path.parts
+        title = pathsplitted[0]
+        fig.suptitle(f'{title}', fontweight='bold')
+
         self._add_checkboxes(fig)
         fig.tight_layout()
+
         figurename = self.results_path / 'I-V-characteristic.pdf'
         plt.savefig(figurename, dpi=300)
 
@@ -194,7 +200,7 @@ class StandardMethod:
         in the specified range
         """
         if ratio is None:
-            raise ValueError("ratio must be provided.")
+            raise ValueError("Ratio must be provided.")
 
         return cur_unbiased*ratio
 
@@ -235,7 +241,7 @@ class StandardMethod:
         measure the negative ion current
         """
 
-        all_ni_results_pc: List[flot64] = []
+        all_ni_results_pc: List[float64] = []
 
         for bcurrent in self.biased_currents:
 
