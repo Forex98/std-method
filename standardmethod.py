@@ -58,8 +58,10 @@ class StandardMethod:
         self.bcurrent_avg: NDArray[np.float64] | None = None
 
         # Outputs
-        self.ni_avg_nc: NDArray[np.float64] | None = None
-        self.ni_std_nc: NDArray[np.float64] | None = None
+        self.ni_avg_nc_scaling: NDArray[np.float64] | None = None
+        self.ni_std_nc_scaling: NDArray[np.float64] | None = None
+        self.ni_avg_nc_shifting: NDArray[np.float64] | None = None
+        self.ni_std_nc_shifting: NDArray[np.float64] | None = None
         self.ni_avg_pc: NDArray[np.float64] | None = None
         self.ni_std_pc: NDArray[np.float64] | None = None
         self.pi_avg: float = 0.0
@@ -196,13 +198,39 @@ class StandardMethod:
     )  -> NDArray[np.float64]:
 
         """
-        Shift unbiased curve to match the biased one
-        in the specified range
+        Scale unbiased curve to match the biased one
         """
         if ratio is None:
             raise ValueError("Ratio must be provided.")
 
         return cur_unbiased*ratio
+
+    def shift_curve(
+        self,
+        cur_unbiased: NDArray[np.float64],
+        cur_biased: NDArray[np.float64],
+        V_min: float = None,
+        V_max: float = None
+    )  -> NDArray[np.float64]:
+
+        """
+        Shift unbiased curve to match the biased one
+        in the specified range
+        """
+
+        # Assign defaults if no value is provided
+        if V_min is None:
+            V_min = self.v_min
+        if V_max is None:
+            V_max = self.v_max
+
+        mask = (self.voltage > V_min) & (self.voltage < V_max)
+        cur_unbiased_masked: NDArray[np.float64] = cur_unbiased[mask]
+        cur_biased_masked: NDArray[np.float64] = cur_biased[mask]
+
+        shift: float = np.mean(cur_biased_masked - cur_unbiased_masked)
+
+        return cur_unbiased + shift
 
     def negative_collector(self, ratio: NDArray[np.float64]) -> None:
         """
@@ -211,10 +239,11 @@ class StandardMethod:
 
         mask = (self.voltage > self.fit_v_min) & ( self.voltage < self.fit_v_max)
         ratio_masked = ratio[mask]
-        # ratio avg
+
         ratio_avg = np.mean(ratio_masked)
 
-        all_ni_results: List[float64] = []
+        all_ni_results_scaling: List[float64] = []
+        all_ni_results_shifting: List[float64] = []
         pi_values: List[float64] = []
         idx_90v = np.argmin(np.abs(self.voltage - (self.minus_90V)))
 
@@ -224,15 +253,57 @@ class StandardMethod:
 
             for ucurrent in self.unbiased_currents:
 
-                # Shift and subtract unbiased currents
+                # Scale/shift and subtract unbiased currents
                 c_unb_scaled = self.scale_curve(ucurrent, ratio_avg)
-                all_ni_results.append(bcurrent - c_unb_scaled)
+                all_ni_results_scaling.append(bcurrent - c_unb_scaled)
+
+                c_unb_shifted = self.shift_curve(ucurrent, bcurrent)
+                all_ni_results_shifting.append(bcurrent - c_unb_shifted)
+
 
         # Saving results
-        self.ni_avg_nc = np.mean(all_ni_results, axis=0)
-        self.ni_std_nc = np.std(all_ni_results, axis=0, ddof = 1)
+        self.ni_avg_nc_scaling = np.mean(all_ni_results_scaling, axis=0)
+        self.ni_std_nc_scaling = np.abs(np.max(all_ni_results_scaling, axis=0) - np.min(all_ni_results_scaling, axis=0))/2
+
+        self.ni_avg_nc_shifting = np.mean(all_ni_results_shifting, axis=0)
+        self.ni_std_nc_shifting = np.abs(np.max(all_ni_results_shifting, axis=0) - np.min(all_ni_results_shifting, axis=0))/2
+
         self.pi_avg = np.mean(pi_values)
         self.pi_std = np.std(pi_values)
+
+    def compare_ni_methods(self):
+        """
+        Compares NI current obtained via Scaling vs Shifting.
+        Visualizes the discrepancy to check for equality.
+        """
+        if self.ni_avg_nc_scaling is None or self.ni_avg_nc_shifting is None:
+            raise ValueError("Run negative_collector() first!")
+
+        # Calculate absolute difference
+        diff = self.ni_avg_nc_scaling - self.ni_avg_nc_shifting
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.plot(self.voltage, self.ni_avg_nc_scaling, label='Scaling Method', color='green')
+        ax.plot(self.voltage, self.ni_avg_nc_shifting, label='Shifting Method', color='red', linestyle='--')
+        ax.fill_between(self.voltage,
+                        self.ni_avg_nc_scaling - self.ni_std_nc_scaling,
+                        self.ni_avg_nc_scaling + self.ni_std_nc_scaling,
+                        color='green', alpha=0.2)
+
+        ax.set_title("NI Current Comparison: Scaling vs Shifting")
+        ax.set_xlabel("Collector Voltage (V)")
+        ax.set_ylabel("Current (A)")
+        ax.legend()
+        ax.grid(True)
+
+        figurename = self.results_path / 'ni_shift_vs_scale.pdf'
+
+        plt.savefig(figurename, dpi=300)
+        plt.close(fig)
+
+        return diff
+
+
 
     def positive_collector(self) -> None:
 
@@ -250,8 +321,8 @@ class StandardMethod:
                 all_ni_results_pc.append(bcurrent - ucurrent)
 
         # Saving results
-        self.ni_avg_pc = np.mean(all_ni_results_pc, axis=0)
-        self.ni_std_pc = np.std(all_ni_results_pc, axis=0, ddof = 1)
+        self.ni_avg_pc: NDArray[np.float64] = np.mean(all_ni_results_pc, axis=0)
+        self.ni_std_pc: NDArray[np.float64] = np.std(all_ni_results_pc, axis=0, ddof = 1)
 
 
     def calculate_ratio(self) -> NDArray[np.float64]:
@@ -265,11 +336,11 @@ class StandardMethod:
 
         # Plot the ratio vs voltage
         fig, ax = plt.subplots()
-        mask = (self.voltage<0)
-        ax.scatter(self.voltage[mask], ratio[mask], marker = '.')
+        #mask = (self.voltage<0)
+        ax.scatter(self.voltage, ratio, marker = '.')
         ax.set_xlabel('Voltage [V]')
         ax.set_ylabel('Ratio')
-        ax.set_ylim(0, 1)
+        #ax.set_ylim(0, 1)
         ax.set_title(r'$I_b/I_u$')
         ax.grid(ls = '-.', alpha = 0.5)
 

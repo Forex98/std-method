@@ -6,25 +6,32 @@ from dataloader import DataLoader
 from standardmethod import StandardMethod
 from configreader import ConfigReader
 from pathlib import Path
+from numpy import typing
 
 print(f'numpy version: {np.__version__}')
 print(f'matplotlib version: {matplotlib.__version__}')
 print('\n')
 
 config = ConfigReader('config.txt')
-minus_27V = config.get('MINUS_27V', -27)
+minus_40V = config.get('MINUS_40V', -40)
+plus_20V = config.get('PLUS_20V', 20)
+current_scale = config.get('CURRENT_SCALE', 1e9)
 
 def comparison(inputlist: list) -> None:
 
     if len(inputlist) > 1:
 
         fig2, ax2 = plt.subplots(figsize=config.get('FIGSIZE', (12, 10)))
+        fig3, ax3 = plt.subplots(figsize=config.get('FIGSIZE', (12, 10)))
 
         for data in inputlist:
 
-            # Negative collector
             ax2.errorbar(data['voltage'], data['nicurr'], yerr=data['dnicurr'],
                          fmt='.', label=f"{data['label']}")
+
+            mask = data['voltage'] <= 0
+
+            ax3.plot(-data['voltage'][mask], data['dni/dv'], label=f"{data['label']}", lw = 2, ls = '-')
 
         ax2.set_xlabel('Voltage [V]')
         ax2.set_ylabel('Current [nA]')
@@ -34,17 +41,8 @@ def comparison(inputlist: list) -> None:
 
         plt.savefig('comparison_ni_curr.pdf', dpi=300)
 
-        fig3, ax3 = plt.subplots(figsize=config.get('FIGSIZE', (12, 10)))
-        fig4, ax4 = plt.subplots()
-
-        mask = data['voltage'] <= 0
-
-
-        for data in inputlist:
-
-            ax3.plot(-data['voltage'][mask], data['dni/dv'], label=f"{data['label']}", lw = 2, ls = '-')
-            ax4.scatter(data['label'], data['ni_minus27V'], label=f"{data['label']}", alpha=  0.7, marker = 'o', s = 4)
-
+        print('\n')
+        print('Comparison Negative Ions currents done!')
 
         ax3.set_xlabel(r'$E_x$ [eV]')
         ax3.set_ylabel('dni/dV')
@@ -54,20 +52,107 @@ def comparison(inputlist: list) -> None:
 
         plt.savefig('comparison_dist_func.pdf', dpi=300)
 
-        ax4.set_ylabel('Current [nA]')
-        ax4.set_title(f'NI Currents at {minus_27V}')
-        ax4.legend()
-        ax4.grid(True, alpha=0.3)
+        print('\n')
+        print('Comparison Negative Ions Energy Distribution done!')
 
-        plt.savefig('comparison_minus_27V.pdf', dpi=300)
+        te_list: NDArray = np.array(config.get('ELECTRON_TEMPERATURES', []))
+        ne_list: NDArray = np.array(config.get('ELECTRON_DENSITIES', []))
+        ion_mass: float = config.get('ION_MASS')
+
+        pressures: NDArray = np.array(config.get('PRESSURES'))
+        powers: NDArray = np.array(config.get('POWERS'))
+
+        ni_minus40V = [data['ni_minus40V'] for data in inputlist]
+        dni_minus40V = [data['dni_minus40V'] for data in inputlist]
+        ni_plus20V = [data['ni_plus20V'] for data in inputlist]
+        dni_plus20V = [data['dni_plus20V'] for data in inputlist]
+
+        if len(pressures) > 0:
+
+            fig4, ax4 = plt.subplots(figsize=config.get('FIGSIZE', (12, 10)))
+
+            ax4.set_ylabel('Current [nA]')
+            ax4.set_title(f'NI Current vs pressure')
+            ax4.grid(True, alpha=0.3)
+
+            ax4.errorbar(pressures, ni_minus40V, yerr=dni_minus40V, label='neg coll', marker = 'o')
+            ax4.errorbar(pressures, ni_plus20V, yerr=dni_plus20V, label="pos coll", marker = '*')
+
+            ax4.legend()
+
+            plt.savefig('comparison_minus_40V_plus_20V.pdf', dpi=300)
+
+            print('\n')
+            print('Comparison negative vs positive collector done.')
+
+            if len(te_list) > 0 and len(ne_list) > 0:
+
+                fig5, ax5 = plt.subplots(figsize=config.get('FIGSIZE', (12, 10)))
+
+                ax5.set_xlabel(r'$\Phi_{PI}$ ')
+                ax5.set_ylabel('Current [nA]')
+                ax5.set_title(f'NI Current vs PI flux')
+                ax5.grid(True, alpha=0.3)
+
+                cross_section: float = config.get('CROSS_SECTION')
+                distance: float = config.get('DISTANCE')
+                boltzmann: float = config.get('BOLTZMANN')
+                gas_temperature: float = config.get('GAS_TEMPERATURE')
+                gas_density: NDArray[np.float64] = pressures / (boltzmann * gas_temperature)
+                mean_free_path: NDArray = 1 / (gas_density * cross_section)
+                correction: NDArray = np.exp(-distance / mean_free_path)
+                pi_fluxes: NDArray = 0.6 * ne_list * np.sqrt(te_list/ion_mass)
+
+                # Applying correction ni
+
+                ni_minus40V_corrected = ni_minus40V / correction
+
+                ax5.scatter(pi_fluxes, ni_minus40V_corrected)
+
+                plt.savefig('comparison_NI_curr_vs_pi_flux_pressure.pdf', dpi=300)
+                print(f'Positive Ion Fluc / m-2: {pi_fluxes}')
+                print(f'Corrected Neg Ion Curr: {ni_minus40V_corrected}')
+
+        elif len(powers) > 0:
+
+            fig4, ax4 = plt.subplots(figsize=config.get('FIGSIZE', (12, 10)))
+
+            ax4.set_ylabel('Current [nA]')
+            ax4.set_title(f'NI Current vs power')
+            ax4.grid(True, alpha=0.3)
+
+            ax4.errorbar(powers, ni_minus40V, yerr=dni_minus40V, label='neg coll', marker = 'o')
+            ax4.errorbar(powers, ni_plus20V, yerr=dni_plus20V, label="pos coll", marker = '*')
+
+            ax4.legend()
+
+            plt.savefig('comparison_minus_40V_plus_20V.pdf', dpi=300)
+
+            if len(te_list) > 0 and len(ne_list) > 0:
+
+                fig5, ax5 = plt.subplots(figsize=config.get('FIGSIZE', (12, 10)))
+
+                ax5.set_xlabel(r'$\Phi_{PI}$ ')
+                ax5.set_ylabel('Current [nA]')
+                ax5.set_title(f'NI Current vs PI flux')
+                ax5.grid(True, alpha=0.3)
+
+                pi_fluxes = 0.6 * ne_list * np.sqrt(te_list/ion_mass)
+
+                ax5.scatter(pi_fluxes, ni_minus40V)
+
+        else:
+
+            print('\n')
+            print('WARNING: No pressures or powers in the config file')
+            print('No comparison NI vs pressure/power will be done')
+            print('\n')
+
+
         plt.show()
 
 
-def analysis(directory: None | Path) -> dict:
-
-    config = ConfigReader('config.txt')
-    current_scale = config.get('CURRENT_SCALE', 1e9)
-    minus_27V = config.get('MINUS_27V', -27)
+def analysis(directory: None | Path) -> None | dict:
 
     loader = DataLoader(config, directory)
 
@@ -81,10 +166,11 @@ def analysis(directory: None | Path) -> dict:
 
     sm.sat_cur_analysis()
     sm.negative_collector(ratio)
+    sm.compare_ni_methods()
     sm.positive_collector()
     voltage = sm.voltage
-    nicurr_nc = sm.ni_avg_nc*current_scale
-    dnicurr_nc = sm.ni_std_nc*current_scale
+    nicurr_nc = sm.ni_avg_nc_scaling*current_scale
+    dnicurr_nc = sm.ni_std_nc_scaling*current_scale
     nicurr_pc = sm.ni_avg_pc*current_scale
     dnicurr_pc = sm.ni_std_pc*current_scale
 
@@ -94,11 +180,16 @@ def analysis(directory: None | Path) -> dict:
     nicurr = np.concatenate((nicurr_nc[mask_nc], nicurr_pc[mask_pc]))
     dnicurr = np.concatenate((dnicurr_nc[mask_nc], dnicurr_pc[mask_pc]))
 
-    idx_minus27V = np.argmin(np.abs(voltage - minus_27V))
-    nicurr_minus27V = nicurr[idx_minus27V]
+    idx_minus40V = np.argmin(np.abs(voltage - minus_40V))
+    nicurr_minus40V = nicurr[idx_minus40V]
+    dnicurr_minus40V = dnicurr[idx_minus40V]
 
-    dni_dv = savgol_filter(nicurr_nc[mask_nc], window_length=11, polyorder=3, deriv=1, delta=1)
-    dni_dv_smooth = savgol_filter(dni_dv, window_length=11, polyorder=3, delta=1)
+    idx_plus20V = np.argmin(np.abs(voltage - plus_20V))
+    nicurr_plus20V = nicurr[idx_plus20V]
+    dnicurr_plus20V = dnicurr[idx_plus20V]
+
+    dni_dv = savgol_filter(nicurr_nc[mask_nc], window_length=11, polyorder=2, deriv=1, delta=1)
+    dni_dv_smooth = savgol_filter(dni_dv, window_length=11, polyorder=2, delta=1)
 
     fig1, ax1 = plt.subplots()
 
@@ -125,16 +216,21 @@ def analysis(directory: None | Path) -> dict:
     plt.savefig(results_folder / 'dist_func.pdf')
     plt.close(fig2)
 
-    output: dict = {
-            'label': loader.subdirectory.name,
-            'voltage': loader.voltage,
-            'nicurr': nicurr,
-            'dnicurr': dnicurr,
-            'ni_minus27V': nicurr_minus27V,
-            'dni/dv': dni_dv_smooth
-            }
+    if directory:
 
-    return output
+        output: dict = {
+                'label': loader.subdirectory.name,
+                'voltage': loader.voltage,
+                'nicurr': nicurr,
+                'dnicurr': dnicurr,
+                'ni_minus40V': nicurr_minus40V,
+                'dni_minus40V': dnicurr_minus40V,
+                'ni_plus20V': nicurr_plus20V,
+                'dni_plus20V': dnicurr_plus20V,
+                'dni/dv': dni_dv_smooth
+                }
+
+        return output
 
 def process_folders(folders: None | Path) -> list:
 
@@ -209,7 +305,7 @@ def main() -> int:
 
         print('\n')
         print('Unbiased and Biased directories found in the main folder')
-        print('Do you want to analyse them? [y/n]')
+        print('Do you want to analyse them? [y/n]\n')
 
         control = input()
 
@@ -234,7 +330,7 @@ def main() -> int:
                 print(f'{directory.name}')
 
             print('\n')
-            print('Do you want to ignore any folder? [y/n]')
+            print('Do you want to ignore any folder? [y/n]\n')
 
             control_folders: str = input()
 
