@@ -2,6 +2,19 @@
 # Standard Method
 # Format: KEY = VALUE
 
+# Constants
+BOLTZMANN = 1.3806E-23
+
+# Plasma properties
+CROSS_SECTION = 4.43E-20
+DISTANCE = 0.047
+GAS_TEMPERATURE = 300
+ION_MASS = 1875E6
+ELECTRON_DENSITIES = [2.13E15, 1.65E15, 2.35E15, 2.70E15, 1.64E15]
+ELECTRON_TEMPERATURES = [0.57, 0.13, 0.12, 0.11, 0.15]
+POWERS = []
+PRESSURES = [0.2, 1.2, 2, 4, 5]
+
 # Voltage range [V]
 VOLTAGE_START = -110
 VOLTAGE_STOP = 40
@@ -17,7 +30,7 @@ FIT_V_MAX = -80
 
 # Fixed voltages [V]
 MINUS_90V = -90
-MINUS_27V = -27
+MINUS_40V = -40
 PLUS_20V = 20
 
 # Plot settings
