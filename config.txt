@@ -2,14 +2,15 @@
 # Standard Method
 # Format: KEY = VALUE
 
-# Constants
-BOLTZMANN = 1.3806E-23
-
-# Plasma properties
+# MRFEA and Plasma properties - Constants
+ION_MASS = 1875E6
 CROSS_SECTION = 4.43E-20
 DISTANCE = 0.047
 GAS_TEMPERATURE = 300
-ION_MASS = 1875E6
+BOLTZMANN = 1.3806E-23
+SPEED_LIGHT = 3E8
+
+# Langmuir probe results
 ELECTRON_DENSITIES = [2.13E15, 1.65E15, 2.35E15, 2.70E15, 1.64E15]
 ELECTRON_TEMPERATURES = [0.57, 0.13, 0.12, 0.11, 0.15]
 POWERS = []
@@ -24,9 +25,9 @@ VOLTAGE_STEPS = 151
 V_MIN = -90
 V_MAX = -70
 
-# Fit tail range
-FIT_V_MIN = -100
-FIT_V_MAX = -80
+# Scaling range [V]
+SCALING_V_MIN = -100
+SCALING_V_MAX = -80
 
 # Fixed voltages [V]
 MINUS_90V = -90
@@ -36,7 +37,13 @@ PLUS_20V = 20
 # Plot settings
 FIGSIZE = (12, 10)
 CURRENT_SCALE = 1E9
-ALPHA = 0.7
+MARKER = '.'
+GRID_TRANSPARENCY = 0.7
+GRID_LINESTYLE = '-.'
+
+# Plot ranges - NI  comparison
+THRESHOLD_VOLTAGE_NEGATIVE = -5
+THRESHOLD_VOLTAGE_POSITIVE = 10
 
 # Folder settings
 UNBIASED_FOLDER = "unbiased"
@@ -56,3 +63,6 @@ EXCLUDED_FILES = [bad_data.txt, test_run.txt]
 
 # None values
 SPECIAL_FLAG = None
+
+# Method
+METHOD = 'scaling'
