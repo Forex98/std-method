@@ -36,12 +36,14 @@ Alessandro Forese
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+
 from scipy.signal import savgol_filter
+from pathlib import Path
+from numpy.typing import NDArray
+
 from dataloader import DataLoader
 from standardmethod import StandardMethod
 from configreader import ConfigReader
-from pathlib import Path
-from numpy import typing
 
 
 config = ConfigReader('config.txt')
@@ -118,7 +120,7 @@ def comparison(inputlist: list) -> None:
         ax3.grid(True, alpha=grid_transparency)
 
         try:
-            fig3.savefig('comparison_ni_curr.pdf', dpi=300)
+            fig3.savefig('comparison_energy_distribution.pdf', dpi=300)
             print("Energy distributions correctly compared!")
         except Exception as e:
             print(f"Error while saving plot: {e}")
@@ -172,10 +174,15 @@ def comparison(inputlist: list) -> None:
                 gas_density: NDArray[np.float64] = pressures / (boltzmann * gas_temperature)
                 mean_free_path: NDArray = 1 / (gas_density * cross_section)
                 correction: NDArray = np.exp(-distance / mean_free_path)
+
+                ##
+                # Estimate the positive ion flux using a Bohm-like approximation.
+                # The coefficient (~0.6) accounts for sheath transmission effects.
                 pi_fluxes: NDArray = 0.6 * ne_list * np.sqrt(te_list*c**2/ion_mass)
 
-                # Applying correction ni
-
+                ##
+                # Correct the measured NI current for losses due to collisions
+                # between the plasma and the detector.
                 ni_minus40V_corrected = ni_minus40V / correction
 
                 ax5.scatter(pi_fluxes, ni_minus40V_corrected)
@@ -295,18 +302,35 @@ def analysis(directory: None | Path) -> None | dict:
     mask_nc = voltage <= threshold_voltage_negative
     mask_pc = voltage >= threshold_voltage_positive
 
+    ##
+    # Merge negative and positive collector regions
+    # to reconstruct the full negative ion current curve.
     nicurr = np.concatenate((nicurr_nc[mask_nc], nicurr_pc[mask_pc]))
     dnicurr = np.concatenate((dnicurr_nc[mask_nc], dnicurr_pc[mask_pc]))
 
+    ##
+    # Extract NI current at the negative collector (-40 V)
+    # by selecting the closest value in the voltage array.
     idx_minus40V = np.argmin(np.abs(voltage - minus_40V))
     nicurr_minus40V = nicurr[idx_minus40V]
     dnicurr_minus40V = dnicurr[idx_minus40V]
 
+    ##
+    # Extract NI current at the positive collector (-20 V)
+    # by selecting the closest value in the voltage array.
     idx_plus20V = np.argmin(np.abs(voltage - plus_20V))
     nicurr_plus20V = nicurr[idx_plus20V]
     dnicurr_plus20V = dnicurr[idx_plus20V]
 
+    ##
+    # Estimate derivative of NI current using Savitzky-Golay filter.
+    # The derivative dI/dV is proportional to the negative ion energy
+    # distribution function.
     dni_dv = savgol_filter(nicurr_nc[mask_nc], window_length=11, polyorder=2, deriv=1, delta=1)
+
+    ##
+    # Apply additional smoothing to reduce numerical noise
+    # introduced by the derivative calculation.
     dni_dv_smooth = savgol_filter(dni_dv, window_length=11, polyorder=2, delta=1)
 
     fig1, ax1 = plt.subplots()
